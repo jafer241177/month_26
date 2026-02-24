@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>تقرير نتائج الطلاب</title>
+<style>
+body {
+    font-family: Arial;
+    direction: rtl;
+    text-align: center;
+    padding: 20px;
+}
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+th, td {
+    border: 1px solid #444;
+    padding: 10px;
+}
+th {
+    background: #eee;
+    cursor: pointer;
+}
+button {
+    padding: 10px 20px;
+    margin: 10px;
+    cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h2>تقرير نتائج الطلاب</h2>
+
+<!-- الفلاتر -->
+<div style="margin-bottom: 20px;">
+    <select id="filterGrade">
+        <option value="">اختر الصف</option>
+    </select>
+
+    <select id="filterClass">
+        <option value="">اختر الفصل</option>
+    </select>
+
+    <button onclick="applyFilter()">تطبيق الفلترة</button>
+</div>
+
+
+<!-- زر التصدير -->
+<button onclick="exportToExcel()">تصدير إلى Excel</button>
+
+<!-- جدول النتائج -->
+<table id="resultsTableFull">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">رقم الأحوال ⬍</th>
+            <th onclick="sortTable(1)">الاسم ⬍</th>
+            <th onclick="sortTable(2)">الصف ⬍</th>
+            <th onclick="sortTable(3)">الفصل ⬍</th>
+            <th onclick="sortTable(4)">الدرجة ⬍</th>
+            <th onclick="sortTable(5)">النسبة ⬍</th>
+            <th onclick="sortTable(6)">التاريخ ⬍</th>
+        </tr>
+    </thead>
+    <tbody id="resultsTable"></tbody>
+</table>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<!-- مكتبة Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+// إعداد Firebase
+const firebaseConfig = {
+    apiKey: "YOUR_KEY",
+    authDomain: "YOUR_DOMAIN",
+    databaseURL: "https://quiz26-caf2f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "quiz26-caf2f",
+    storageBucket: "quiz26-caf2f.appspot.com",
+    messagingSenderId: "YOUR_SENDER",
+    appId: "YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+
+let allResults = [];
+
+// تحميل النتائج من Firebase
+function loadResults() {
+    const table = document.getElementById("resultsTable");
+    table.innerHTML = "";
+
+    firebase.database().ref("month").once("value", snapshot => {
+        allResults = [];
+
+        snapshot.forEach(child => {
+            allResults.push(child.val());
+        });
+
+        displayResults(allResults);
+        buildFilters(); // ← هنا نبني الفلاتر تلقائيًا
+    });
+}
+
+
+// عرض النتائج
+function displayResults(results) {
+    const table = document.getElementById("resultsTable");
+    table.innerHTML = "";
+
+    results.forEach(data => {
+        const row = `
+            <tr data-grade="${data.grade}" data-class="${data.class}">
+                <td>${data.studentId}</td>
+                <td>${data.name}</td>
+                <td>${data.grade}</td>
+                <td>${data.class}</td>
+                <td>${data.score} / ${data.total}</td>
+                <td>${data.percentage}%</td>
+                <td>${data.time}</td>
+            </tr>
+        `;
+        table.innerHTML += row;
+    });
+}
+
+// تطبيق الفلترة
+function applyFilter() {
+    const grade = document.getElementById("filterGrade").value;
+    const classNum = document.getElementById("filterClass").value;
+
+    let filtered = allResults;
+
+    if (grade) filtered = filtered.filter(r => r.grade == grade);
+    if (classNum) filtered = filtered.filter(r => r.class == classNum);
+
+    displayResults(filtered);
+}
+function buildFilters() {
+    const gradeSelect = document.getElementById("filterGrade");
+    const classSelect = document.getElementById("filterClass");
+
+    // مسح الخيارات القديمة
+    gradeSelect.innerHTML = '<option value="">اختر الصف</option>';
+    classSelect.innerHTML = '<option value="">اختر الفصل</option>';
+
+    // استخراج الصفوف والفصول من البيانات
+    const grades = [...new Set(allResults.map(r => r.grade))];
+    const classes = [...new Set(allResults.map(r => r.class))];
+
+    // تعبئة الصفوف
+    grades.forEach(g => {
+        const option = document.createElement("option");
+        option.value = g;
+        option.textContent = g;
+        gradeSelect.appendChild(option);
+    });
+
+    // تعبئة الفصول
+    classes.forEach(c => {
+        const option = document.createElement("option");
+        option.value = c;
+        option.textContent = "الفصل " + c;
+        classSelect.appendChild(option);
+    });
+}
+
+
+// دالة الترتيب
+let sortDirection = true;
+
+function sortTable(columnIndex) {
+    const table = document.getElementById("resultsTableFull");
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+
+    rows.sort((a, b) => {
+        let A = a.children[columnIndex].innerText.trim();
+        let B = b.children[columnIndex].innerText.trim();
+
+        // إذا كانت أرقام
+        if (!isNaN(A) && !isNaN(B)) {
+            A = Number(A);
+            B = Number(B);
+            return sortDirection ? A - B : B - A;
+        }
+
+        // إذا كانت نصوص
+        return sortDirection ? A.localeCompare(B) : B.localeCompare(A);
+    });
+
+    sortDirection = !sortDirection;
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+// تصدير إلى Excel
+function exportToExcel() {
+    let table = document.getElementById("resultsTableFull");
+    let workbook = XLSX.utils.table_to_book(table, {sheet: "النتائج"});
+    XLSX.writeFile(workbook, "نتائج_الطلاب.xlsx");
+}
+
+// تحميل النتائج عند فتح الصفحة
+loadResults();
+</script>
+
+</body>
+</html>
