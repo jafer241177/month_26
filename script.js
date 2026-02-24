@@ -96,25 +96,31 @@ function submitExam() {
         }
     }
 
-    let correctCount = 0;
+   let correctCount = 0;
 
-    randomizedQuestions.forEach((q, index) => {
-        const selected = document.querySelector(`input[name="q${index}"]:checked`);
-        const studentAnswer = selected ? parseInt(selected.value) : null;
+randomizedQuestions.forEach((q, index) => {
+    const selected = document.querySelector(`input[name="q${index}"]:checked`);
+    const studentAnswer = selected ? parseInt(selected.value) : null;
 
-        if (studentAnswer === q.correct) correctCount++;
-    });
+    if (studentAnswer === q.correct) correctCount++;
+});
 
-    const result = {
-        studentId: student.id,
-        name: student.name,
-        grade: student.grade,
-        class: student.class,
-        score: correctCount,
-        total: randomizedQuestions.length,
-        percentage: Math.round((correctCount / randomizedQuestions.length) * 100),
-        time: new Date().toLocaleString()
-    };
+// حساب الدرجة من 15
+let finalScore = correctCount * (15 / randomizedQuestions.length);
+
+finalScore = Math.round(finalScore * 100) / 100; // تقريب إلى منزلتين
+
+const result = {
+    studentId: student.id,
+    name: student.name,
+    grade: student.grade,
+    class: student.class,
+    score: finalScore,   // الدرجة من 15
+    total: 15,           // المجموع 15
+    percentage: Math.round((finalScore / 15) * 100),
+    time: new Date().toLocaleString()
+};
+
 
     // تخزين في Firebase داخل /month/studentId
     firebase.database().ref("month/" + student.id).set(result)
@@ -126,3 +132,4 @@ function submitExam() {
             alert("خطأ أثناء حفظ البيانات: " + error);
         });
 }
+
